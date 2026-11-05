@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101014">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="twin">
+<link rel="manifest" href='data:application/manifest+json,{"name":"twin","short_name":"twin","start_url":".","display":"standalone","background_color":"%23101014","theme_color":"%23101014","icons":[{"src":"data:image/svg%2Bxml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 512 512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27112%27 fill=%27%23101014%27/%3E%3Ctext x=%27256%27 y=%27344%27 font-size=%27280%27 font-family=%27sans-serif%27 fill=%27%23c8623c%27 text-anchor=%27middle%27%3Et%3C/text%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
+<title>twin</title>
+<style>
+:root{--bg:#101014;--fg:#e8e6e3;--mut:#8b8b93;--card:#1a1a20;--in:#15151b;--bd:#2a2a33;--pri:#c8623c}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,ui-sans-serif,system-ui,sans-serif;
+ display:flex;flex-direction:column;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+header{padding:calc(10px + env(safe-area-inset-top)) 14px 8px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
+header b{font-size:15px;font-weight:500}
+#kstate{font-size:11px;color:var(--mut)}
+main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.pane{flex:1;display:none;flex-direction:column;overflow:hidden;padding:10px 14px}
+.pane.on{display:flex}
+input,textarea,select{background:var(--in);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:10px 11px;font:inherit;font-size:14px;outline:none;width:100%}
+textarea{resize:none}
+button{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:11px 15px;font:inherit;font-size:14px;font-weight:500}
+button.sec{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
+.row{display:flex;gap:7px;align-items:center}
+#log{flex:1;overflow-y:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch}
+.msg{margin:0 0 14px;white-space:pre-wrap;word-wrap:break-word}
+.who{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin-bottom:3px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--bg);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom);z-index:9}
+nav button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;padding:12px 0;border-radius:0}
+nav button.on{color:var(--pri);font-weight:500}
+#gallery{display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow-y:auto;padding-bottom:10px}
+#gallery img{width:100%;border-radius:10px;display:block;border:1px solid var(--bd)}
+#err{color:#e0623f;font-size:12px;padding:0 14px 8px;white-space:pre-wrap}
+.muted{color:var(--mut);font-size:11px}
+label.chk{display:flex;gap:7px;align-items:center;font-size:13px;color:var(--fg);margin-bottom:12px}
+label.chk input{width:auto}
+#gate{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;justify-content:center;padding:24px;gap:12px}
+#gate h2{font-size:17px;font-weight:500;margin:0}
+</style></head><body>
+
+<header><b>twin</b><span id="kstate"></span></header>
+<div id="err"></div>
+
+<main>
+  <div class="pane on" id="pChat">
+    <div class="row" style="margin-bottom:8px">
+      <input id="chatModel" list="cm" value="venice-uncensored">
+      <button id="clear" class="sec" style="width:auto;padding:10px 13px">clear</button>
+    </div>
+    <datalist id="cm"><option value="venice-uncensored"><option value="venice-uncensored-role-play"><option value="qwen3-235b-a22b-instruct-2507"><option value="llama-3.3-70b"><option value="deepseek-v3.2"></datalist>
+    <div id="log"></div>
+    <div class="row" style="padding-bottom:8px">
+      <textarea id="msg" rows="1" placeholder="message"></textarea>
+      <button id="send" style="width:auto;padding:12px 16px">↑</button>
+      <button id="stop" class="sec" style="width:auto;padding:12px 16px;display:none">■</button>
+    </div>
+  </div>
+
+  <div class="pane" id="pImg">
+    <div class="row" style="margin-bottom:8px">
+      <input id="imgModel" list="im" value="chroma">
+      <select id="ratio" style="width:auto"><option value="832x1216">2:3</option><option value="1216x832">3:2</option><option value="1024x1024">1:1</option><option value="768x1344">9:16</option><option value="1344x768">16:9</option></select>
+    </div>
+    <datalist id="im"><option value="chroma"><option value="flux.1-dev-uncensored"><option value="flux.1-dev"><option value="stable-diffusion-3.5-large"></datalist>
+    <textarea id="prompt" rows="3" placeholder="prompt" style="margin-bottom:7px"></textarea>
+    <textarea id="neg" rows="2" placeholder="negative prompt" style="margin-bottom:7px"></textarea>
+    <div class="row" style="margin-bottom:9px;flex-wrap:wrap">
+      <label class="chk" style="margin:0"><input id="safeOff" type="checkbox" checked> safe off</label>
+      <button id="gen" style="flex:1">generate</button>
+    </div>
+    <div id="gallery"></div>
+  </div>
+
+  <div class="pane" id="pSet">
+    <label class="chk"><input id="noSys" type="checkbox" checked> strip venice system prompt</label>
+    <label class="chk"><input id="noPre" type="checkbox" checked> no-preamble instruction</label>
+    <div class="row" style="margin-bottom:12px">
+      <label class="muted" style="flex:1">temp<br><input id="temp" type="number" step="0.05" value="0.95"></label>
+      <label class="muted" style="flex:1">top_p<br><input id="topp" type="number" step="0.05" value="0.95"></label>
+    </div>
+    <button id="chKey" class="sec">change API key</button>
+    <p class="muted" style="margin-top:14px">Key and settings stay on this device. Conversations persist locally; images download on tap.</p>
+  </div>
+</main>
+
+<nav>
+  <button class="on" data-p="Chat">chat</button>
+  <button data-p="Img">image</button>
+  <button data-p="Set">settings</button>
+</nav>
+
+<div id="gate">
+  <h2>venice API key</h2>
+  <p class="muted" style="margin:0">venice.ai → API. Stored on this device only.</p>
+  <input id="kIn" type="password" placeholder="key" autocomplete="off">
+  <button id="kGo">save</button>
+</div>
+
+<script>
+const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s';
+let key=localStorage.getItem(K)||'', ac=null, msgs=[];
+let S=Object.assign({noSys:1,noPre:1,temp:.95,topp:.95},JSON.parse(localStorage.getItem(SS)||'{}'));
+
+$('noSys').checked=!!S.noSys; $('noPre').checked=!!S.noPre; $('temp').value=S.temp; $('topp').value=S.topp;
+['noSys','noPre','temp','topp'].forEach(i=>$(i).onchange=()=>{
+  S={noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,temp:+$('temp').value||.95,topp:+$('topp').value||.95};
+  localStorage.setItem(SS,JSON.stringify(S));});
+
+function gate(){ $('gate').style.display = key ? 'none' : 'flex'; $('kstate').textContent = key ? 'key set' : ''; }
+gate();
+$('kGo').onclick=()=>{ const v=$('kIn').value.trim(); if(!v)return; key=v; localStorage.setItem(K,v); gate(); };
+$('chKey').onclick=()=>{ $('kIn').value=''; $('gate').style.display='flex'; };
+
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  ['Chat','Img','Set'].forEach(p=>$('p'+p).classList.remove('on')); $('p'+b.dataset.p).classList.add('on');});
+
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+key});
+function add(w,t){const d=document.createElement('div');d.className='msg';
+  const n=document.createElement('div');n.className='who';n.textContent=w==='user'?'you':'model';
+  const b=document.createElement('div');b.textContent=t;d.append(n,b);$('log').append(d);
+  $('log').scrollTop=$('log').scrollHeight;return b;}
+function load(){try{msgs=JSON.parse(localStorage.getItem(CS)||'[]')}catch(e){msgs=[]}
+  $('log').innerHTML='';msgs.forEach(m=>add(m.role,m.content));}
+function save(){localStorage.setItem(CS,JSON.stringify(msgs));}
+load();
+$('clear').onclick=()=>{msgs=[];save();$('log').innerHTML='';};
+$('msg').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,120)+'px';});
+
+async function send(){
+  const t=$('msg').value.trim(); if(!t||!key)return;
+  $('err').textContent=''; $('msg').value=''; $('msg').style.height='auto';
+  msgs.push({role:'user',content:t}); add('user',t); save();
+  const out=add('assistant',''); $('send').style.display='none'; $('stop').style.display='block';
+  ac=new AbortController();
+  const sm=msgs.slice();
+  if(S.noPre) sm.unshift({role:'system',content:'No preamble. Never open with "Certainly" or "Great question". Answer directly, do not restate the question, no closing offer to help.'});
+  try{
+    const r=await fetch('https://api.venice.ai/api/v1/chat/completions',{method:'POST',headers:H(),signal:ac.signal,
+      body:JSON.stringify({model:$('chatModel').value.trim(),messages:sm,stream:true,
+        temperature:+S.temp,top_p:+S.topp,max_tokens:2000,
+        venice_parameters:{include_venice_system_prompt:!S.noSys}})});
+    if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+    const rd=r.body.getReader(),dec=new TextDecoder(); let buf='',full='';
+    while(true){const{done,value}=await rd.read(); if(done)break;
+      buf+=dec.decode(value,{stream:true}); const ps=buf.split('\n\n'); buf=ps.pop();
+      for(const p of ps)for(const ln of p.split('\n')){
+        if(!ln.startsWith('data: '))continue; const raw=ln.slice(6).trim(); if(raw==='[DONE]')continue;
+        try{const j=JSON.parse(raw);const dl=j.choices?.[0]?.delta?.content;
+          if(dl){full+=dl;out.textContent=full;$('log').scrollTop=$('log').scrollHeight;}}catch(e){}}}
+    msgs.push({role:'assistant',content:full}); save();
+  }catch(e){ if(e.name==='AbortError')out.textContent+='\n[stopped]'; else $('err').textContent='failed: '+e.message; }
+  finally{ $('send').style.display='block'; $('stop').style.display='none'; ac=null; }
+}
+$('send').onclick=send; $('stop').onclick=()=>ac&&ac.abort();
+
+$('gen').onclick=async()=>{
+  const p=$('prompt').value.trim(); if(!p||!key)return; $('err').textContent='';
+  const [w,h]=$('ratio').value.split('x').map(Number);
+  $('gen').textContent='…'; $('gen').disabled=true;
+  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked};
+  if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
+  try{
+    const r=await fetch('https://api.venice.ai/api/v1/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+    if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+    const j=await r.json(); if(!j.images?.length)throw new Error('no image');
+    j.images.forEach(x=>{const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
+      const a=document.createElement('a');a.href=s;a.download='twin-'+Date.now()+'.png';a.target='_blank';
+      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);});
+  }catch(e){ $('err').textContent='failed: '+e.message; }
+  finally{ $('gen').textContent='generate'; $('gen').disabled=false; }
+};
+</script></body></html>
