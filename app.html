@@ -47,10 +47,10 @@ label.chk input{width:auto}
 <main>
   <div class="pane on" id="pChat">
     <div class="row" style="margin-bottom:6px">
-      <input id="chatModel" list="cm" value="qwen2.5-vl-72b-a14b-instruct">
+      <input id="chatModel" list="cm" value="default_vision">
       <button id="clear" class="sec" style="width:auto;padding:10px 13px">clear</button>
     </div>
-    <datalist id="cm"><option value="qwen2.5-vl-72b-a14b-instruct"><option value="llama-3.2-11b-vision-instruct"><option value="deepseek-v3.2"><option value="venice-uncensored-role-play"></datalist>
+    <datalist id="cm"><option value="default_vision">default_vision</option><option value="most_uncensored">most_uncensored · uncensored</option><option value="venice-uncensored-1-2"><option value="venice-uncensored-role-play"><option value="qwen3-vl-235b-a22b"><option value="qwen-3-8-27b"><option value="gemma-4-uncensored"><option value="mistral-small-3-2-24b-instruct"></datalist>
     <div id="people"></div>
     <div id="log"></div>
     <div class="row" style="padding-bottom:8px">
@@ -83,7 +83,7 @@ label.chk input{width:auto}
       <label class="muted" style="flex:1">temp<br><input id="temp" type="number" step="0.05" value="0.9"></label>
       <label class="muted" style="flex:1">top_p<br><input id="topp" type="number" step="0.05" value="0.95"></label>
     </div>
-    <label class="muted" style="display:block;margin-bottom:6px">my endpoint<br><input id="endpoint" value=""></label>
+    <label class="muted" style="display:block;margin-bottom:6px">my endpoint<br><input id="endpoint" value="https://into-herb-rid-pics.trycloudflare.com"></label>
     <p class="muted" style="margin:6px 0 14px">blank = venice only. put your tunnel here and it's used whenever reachable.</p>
     <button id="chKey" class="sec">change API key</button>
   </div>
@@ -98,25 +98,40 @@ label.chk input{width:auto}
 <script>
 const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s', CH='tw_chars';
 const VEN='https://api.venice.ai/api/v1';
+const LIVE_EP='https://into-herb-rid-pics.trycloudflare.com';
+const DEAD_EP=['spoke-period-capitol-posing.trycloudflare.com','refinance-racks-badge-terry.trycloudflare.com'];
+const FALLBACK_CHAT='default_vision';
+const RETIRED_CHAT=['qwen2.5-vl-72b-a14b-instruct','llama-3.2-11b-vision-instruct'];
 let key=localStorage.getItem(K)||'', ac=null, msgs=[], chars=[], myUp=null, myChecked=0;
-let S=Object.assign({autoIll:1,autoRoute:1,noSys:1,noPre:1,temp:.9,topp:.95,endpoint:''},JSON.parse(localStorage.getItem(SS)||'{}'));
+let S=Object.assign({autoIll:1,autoRoute:1,noSys:1,noPre:1,temp:.9,topp:.95,endpoint:LIVE_EP,chatModel:FALLBACK_CHAT,imgModel:'chroma'},JSON.parse(localStorage.getItem(SS)||'{}'));
+let migrate=false;
+if(!S.chatModel||RETIRED_CHAT.includes(S.chatModel)){ S.chatModel=FALLBACK_CHAT; migrate=true; }
+if(!String(S.endpoint||'').trim()||DEAD_EP.some(h=>String(S.endpoint).includes(h))){ S.endpoint=LIVE_EP; migrate=true; }
+if(migrate) localStorage.setItem(SS,JSON.stringify(S));
 try{chars=JSON.parse(localStorage.getItem(CH)||'[]')}catch(e){chars=[]}
 ['autoIll','autoRoute','noSys','noPre'].forEach(i=>$(i).checked=!!S[i]);
-$('temp').value=S.temp; $('topp').value=S.topp; $('endpoint').value=S.endpoint;
-['autoIll','autoRoute','noSys','noPre','temp','topp','endpoint'].forEach(i=>$(i).onchange=()=>{
+$('temp').value=S.temp; $('topp').value=S.topp; $('endpoint').value=S.endpoint; $('chatModel').value=S.chatModel; $('imgModel').value=S.imgModel||'chroma';
+function saveS(){
   S={autoIll:$('autoIll').checked?1:0,autoRoute:$('autoRoute').checked?1:0,noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,
-     temp:+$('temp').value||.9,topp:+$('topp').value||.95,endpoint:$('endpoint').value.trim()};
-  localStorage.setItem(SS,JSON.stringify(S)); myUp=null;});
-$('endpoint').oninput=$('endpoint').onchange;
+     temp:+$('temp').value||.9,topp:+$('topp').value||.95,endpoint:$('endpoint').value.trim(),chatModel:$('chatModel').value.trim(),imgModel:$('imgModel').value.trim()};
+  localStorage.setItem(SS,JSON.stringify(S)); myUp=null;
+}
+['autoIll','autoRoute','noSys','noPre','temp','topp','endpoint','chatModel','imgModel'].forEach(i=>$(i).onchange=saveS);
+$('endpoint').oninput=saveS;
+const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+key});
 function gate(){ $('gate').style.display=key?'none':'flex'; $('kstate').textContent=key?'key set':''; }
+function saveKey(){
+  const v=$('kIn').value.trim(); if(!v)return;
+  key=v; localStorage.setItem(K,v); gate(); loadModels();
+}
 gate();
-$('kGo').onclick=()=>{const v=$('kIn').value.trim(); if(!v)return; key=v; localStorage.setItem(K,v); gate();};
+loadModels();
+$('kGo').onclick=saveKey;
 $('chKey').onclick=()=>{$('kIn').value=''; $('gate').style.display='flex';};
 function err(t){ $('err').textContent=t; $('err').style.display=t?'block':'none'; }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   ['Chat','Img','Set'].forEach(p=>$('p'+p).classList.remove('on')); $('p'+b.dataset.p).classList.add('on');});
-const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+key});
 async function ep(){
   if(!S.endpoint) return VEN;
   if(!S.autoRoute) return S.endpoint;
@@ -183,19 +198,26 @@ $('pFile').onchange=e=>{
 };
 function sysPrompt(){
   const p=['No preamble. Never open with "Certainly". Answer directly, no closing offer to help.'];
-  if(chars.length) p.push('Known people: '+chars.map(c=>c.name).join(', ')+'. Their photos are earlier in the thread — keep faces and builds consistent.');
+  if(chars.length) p.push('Known people: '+chars.map(c=>c.name).join(', ')+'. Their photos are earlier in the thread — keep faces and builds consistent. Whenever one of them is in the scene, include their exact name (e.g. '+chars.map(c=>c.name).join(', ')+') in the [[img: ...]] prompt.');
   p.push('Write scenes visually: framing, pose, clothing, light, setting. When a reply describes a moment worth seeing, end with [[img: prompt]] on its own line.');
   return p.join(' ');
 }
 async function chat(){
   const sm=[{role:'system',content:sysPrompt()},...msgs];
   const out=add('assistant',''); $('send').style.display='none'; $('stop').style.display='block';
-  ac=new AbortController();
   try{
-    const r=await fetch(VEN+'/chat/completions',{method:'POST',headers:H(),signal:ac.signal,
-      body:JSON.stringify({model:$('chatModel').value.trim(),messages:sm,stream:true,
-        temperature:+S.temp,top_p:+S.topp,max_tokens:2500,
-        venice_parameters:{include_venice_system_prompt:!S.noSys}})});
+    let r;
+    for(let attempt=0; attempt<2; attempt++){
+      if(!$('chatModel').value.trim()) $('chatModel').value=FALLBACK_CHAT;
+      ac=new AbortController();
+      const model=$('chatModel').value.trim();
+      r=await fetch(VEN+'/chat/completions',{method:'POST',headers:H(),signal:ac.signal,
+        body:JSON.stringify({model,messages:sm,stream:true,
+          temperature:+S.temp,top_p:+S.topp,max_tokens:2500,
+          venice_parameters:{include_venice_system_prompt:!S.noSys}})});
+      if(r.status===404 && attempt===0){ $('chatModel').value=FALLBACK_CHAT; saveS(); continue; }
+      break;
+    }
     if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
     const rd=r.body.getReader(),dec=new TextDecoder(); let buf='',full='';
     while(true){const{done,value}=await rd.read(); if(done)break;
@@ -215,19 +237,24 @@ async function chat(){
   finally{ $('send').style.display='block'; $('stop').style.display='none'; ac=null; }
 }
 async function send(){
-  const t=$('msg').value.trim(); if(!t||!key)return;
+  const t=$('msg').value.trim(); if(!key)return;
+  if(!t){
+    if(msgs.length&&msgs[msgs.length-1].role==='user'){ err(''); chat(); }
+    return;
+  }
   err(''); $('msg').value=''; $('msg').style.height='auto';
   msgs.push({role:'user',content:t}); add('user',t); save(); chat();
 }
 $('send').onclick=send; $('stop').onclick=()=>ac&&ac.abort();
 const scrub=p=>p.replace(/\b12 year old\b/gi,'twelve-year-old').replace(/\s+/g,' ').trim();
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 async function genInline(promptText, container){
   const holder=document.createElement('div'); holder.className='muted'; holder.textContent='generating…';
   container.append(holder);
-  const face=chars.find(c=>new RegExp('\\b'+c.name+'\\b','i').test(promptText));
-  const b={model:$('imgModel').value.trim(),prompt:promptText,width:832,height:1216,format:'png',safe_mode:false,steps:28,cfg_scale:7};
-  if(face) b.face_b64=face.b64.split(',')[1];
+  const face=chars.find(c=>new RegExp('\\b'+reEsc(c.name)+'\\b','i').test(promptText))||(chars.length===1?chars[0]:null);
   const base=(await ep()).replace(/\/$/,'');
+  const b={model:$('imgModel').value.trim(),prompt:promptText,width:832,height:1216,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
+  if(face) b.face_b64=face.b64.split(',')[1];
   try{
     let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
     if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
@@ -249,10 +276,10 @@ $('gen').onclick=async()=>{
   const p=$('prompt').value.trim(); if(!p)return; err('');
   const [w,h]=$('ratio').value.split('x').map(Number);
   $('gen').textContent='…'; $('gen').disabled=true;
-  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:7};
+  const base=(await ep()).replace(/\/$/,'');
+  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
   if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
   if(faceB64)b.face_b64=faceB64;
-  const base=(await ep()).replace(/\/$/,'');
   try{
     let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
     if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
@@ -264,4 +291,48 @@ $('gen').onclick=async()=>{
   }catch(e){ err('image failed: '+e.message); }
   finally{ $('gen').textContent='generate'; $('gen').disabled=false; }
 };
+function modelOpt(dl, value, text){
+  const o=document.createElement('option'); o.value=value; o.textContent=text||value; dl.append(o);
+}
+function uncFirst(list){
+  return list.map((m,i)=>({m,i})).sort((a,b)=>{
+    const ua=a.m.model_spec&&a.m.model_spec.uncensored===true?0:1;
+    const ub=b.m.model_spec&&b.m.model_spec.uncensored===true?0:1;
+    return ua-ub||a.i-b.i;
+  }).map(x=>x.m);
+}
+async function loadModels(){
+  try{
+    const opts={cache:'no-store'};
+    if(key) opts.headers=H();
+    const r=await fetch(VEN+'/models?type=all', opts);
+    if(!r.ok) return;
+    const j=await r.json();
+    const data=Array.isArray(j)?j:(j.data||[]);
+    if(!data.length) return;
+    const depOf=id=>data.find(m=>m&&m.id===id&&m.model_spec&&m.model_spec.deprecation);
+    let changed=false;
+    const chatDep=depOf($('chatModel').value.trim());
+    if(chatDep){ $('chatModel').value=chatDep.model_spec.deprecation.replacementModelId||FALLBACK_CHAT; changed=true; }
+    const alive=data.filter(m=>m&&m.id&&!(m.model_spec&&m.model_spec.deprecation));
+    const vision=uncFirst(alive.filter(m=>m.type==='text'&&m.model_spec&&m.model_spec.capabilities&&m.model_spec.capabilities.supportsVision===true));
+    const images=uncFirst(alive.filter(m=>m.type==='image'));
+    const cm=$('cm'); cm.innerHTML='';
+    modelOpt(cm,'default_vision','default_vision');
+    modelOpt(cm,'most_uncensored','most_uncensored · uncensored');
+    vision.forEach(m=>modelOpt(cm,m.id,m.model_spec.uncensored===true?m.id+' · uncensored':m.id));
+    const im=$('im'); im.innerHTML='';
+    images.forEach(m=>modelOpt(im,m.id,m.model_spec&&m.model_spec.uncensored===true?m.id+' · uncensored':m.id));
+    const imgVal=$('imgModel').value.trim();
+    const imgDep=depOf(imgVal);
+    if(!imgVal||imgDep){
+      const repl=imgDep&&imgDep.model_spec.deprecation.replacementModelId;
+      const ids=new Set(images.map(m=>m.id));
+      const fallback=images.find(m=>m.id==='lustify-sdxl')||images.find(m=>m.model_spec&&m.model_spec.uncensored===true)||images[0];
+      const pick=repl&&ids.has(repl)?repl:(fallback&&fallback.id);
+      if(pick){ $('imgModel').value=pick; changed=true; }
+    }
+    if(changed) saveS();
+  }catch(e){}
+}
 </script></body></html>
