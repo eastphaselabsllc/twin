@@ -187,7 +187,7 @@ $('gen').onclick=async()=>{
   const p=$('prompt').value.trim(); if(!p||!key)return; $('err').textContent='';
   const [w,h]=$('ratio').value.split('x').map(Number);
   $('gen').textContent='…'; $('gen').disabled=true;
-  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked,steps:28,cfg_scale:7};
+  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked,steps:28,cfg_scale:5.5};
   if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
   if(faceB64)b.face_b64=faceB64;
   try{
