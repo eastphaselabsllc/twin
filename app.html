@@ -21,6 +21,7 @@ main{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pane{flex:1;display:none;flex-direction:column;overflow:hidden;padding:10px 14px}
 .pane.on{display:flex}
 input,textarea,select{background:var(--in);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:10px 11px;font:inherit;font-size:14px;outline:none;width:100%}
+input[type=file]::file-selector-button{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;margin-right:10px;font:inherit}
 textarea{resize:none}
 button{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:11px 15px;font:inherit;font-size:14px;font-weight:500}
 button.sec{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
@@ -65,6 +66,7 @@ label.chk input{width:auto}
       <select id="ratio" style="width:auto"><option value="832x1216">2:3</option><option value="1216x832">3:2</option><option value="1024x1024">1:1</option><option value="768x1344">9:16</option><option value="1344x768">16:9</option></select>
     </div>
     <datalist id="im"><option value="chroma"><option value="flux.1-dev-uncensored"><option value="flux.1-dev"><option value="stable-diffusion-3.5-large"></datalist>
+    <input type="file" id="face" accept="image/*" style="margin-bottom:7px"><div id="facePrev"></div>
     <textarea id="prompt" rows="3" placeholder="prompt" style="margin-bottom:7px"></textarea>
     <textarea id="neg" rows="2" placeholder="negative prompt" style="margin-bottom:7px"></textarea>
     <div class="row" style="margin-bottom:9px;flex-wrap:wrap">
@@ -82,6 +84,7 @@ label.chk input{width:auto}
       <label class="muted" style="flex:1">top_p<br><input id="topp" type="number" step="0.05" value="0.95"></label>
     </div>
     <button id="chKey" class="sec">change API key</button>
+    <label class="muted" style="display:block;margin-top:14px">endpoint<br><input id="endpoint" value="https://api.venice.ai/api/v1"></label>
     <p class="muted" style="margin-top:14px">Key and settings stay on this device. Conversations persist locally; images download on tap.</p>
   </div>
 </main>
@@ -100,14 +103,16 @@ label.chk input{width:auto}
 </div>
 
 <script>
-const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s';
-let key=localStorage.getItem(K)||'', ac=null, msgs=[];
-let S=Object.assign({noSys:1,noPre:1,temp:.95,topp:.95},JSON.parse(localStorage.getItem(SS)||'{}'));
+const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s', EP='https://api.venice.ai/api/v1';
+let key=localStorage.getItem(K)||'', ac=null, msgs=[], faceB64='', faceSeq=0;
+let S=Object.assign({noSys:1,noPre:1,temp:.95,topp:.95,endpoint:EP},JSON.parse(localStorage.getItem(SS)||'{}'));
 
 $('noSys').checked=!!S.noSys; $('noPre').checked=!!S.noPre; $('temp').value=S.temp; $('topp').value=S.topp;
-['noSys','noPre','temp','topp'].forEach(i=>$(i).onchange=()=>{
-  S={noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,temp:+$('temp').value||.95,topp:+$('topp').value||.95};
+S.endpoint=String(S.endpoint||'').trim()||EP; $('endpoint').value=S.endpoint;
+['noSys','noPre','temp','topp','endpoint'].forEach(i=>$(i).onchange=()=>{
+  S={noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,temp:+$('temp').value||.95,topp:+$('topp').value||.95,endpoint:$('endpoint').value.trim()};
   localStorage.setItem(SS,JSON.stringify(S));});
+$('endpoint').oninput=$('endpoint').onchange;
 
 function gate(){ $('gate').style.display = key ? 'none' : 'flex'; $('kstate').textContent = key ? 'key set' : ''; }
 gate();
@@ -157,19 +162,47 @@ async function send(){
 }
 $('send').onclick=send; $('stop').onclick=()=>ac&&ac.abort();
 
+function clearFace(){faceSeq++;faceB64='';const el=$('face');if(el.value)el.value='';$('facePrev').innerHTML='';}
+$('face').onchange=()=>{
+  const f=$('face').files&&$('face').files[0], seq=++faceSeq;
+  if(!f){clearFace();return;}
+  const r=new FileReader();
+  r.onload=()=>{
+    if(seq!==faceSeq||typeof r.result!=='string')return;
+    faceB64=r.result.split(',')[1]||'';
+    $('facePrev').innerHTML='';
+    if(!faceB64)return;
+    const im=document.createElement('img');im.src=r.result;im.alt='reference face';
+    im.style.cssText='width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);display:block';
+    const rm=document.createElement('button');rm.type='button';rm.className='sec';rm.textContent='remove';
+    rm.style.cssText='width:auto;padding:6px 10px;font-size:12px';rm.onclick=clearFace;
+    const row=document.createElement('div');row.className='row';row.style.marginBottom='7px';
+    row.append(im,rm);$('facePrev').append(row);
+  };
+  r.onerror=()=>{if(seq===faceSeq){clearFace();$('err').textContent='failed: could not read image';}};
+  r.readAsDataURL(f);
+};
+
 $('gen').onclick=async()=>{
   const p=$('prompt').value.trim(); if(!p||!key)return; $('err').textContent='';
   const [w,h]=$('ratio').value.split('x').map(Number);
   $('gen').textContent='…'; $('gen').disabled=true;
-  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked};
+  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked,steps:28,cfg_scale:5.5};
   if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
+  if(faceB64)b.face_b64=faceB64;
   try{
-    const r=await fetch('https://api.venice.ai/api/v1/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+    const r=await fetch((S.endpoint||EP).replace(/\/+$/,'')+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
     if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
     const j=await r.json(); if(!j.images?.length)throw new Error('no image');
-    j.images.forEach(x=>{const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
+    let shown=0;
+    j.images.forEach(x=>{
+      const raw=typeof x==='string'?x:(x&&typeof x==='object'&&(x.b64_json||x.base64||x.image||(typeof x.url==='string'?x.url:'')))||'';
+      if(typeof raw!=='string'||!raw)return;
+      const s=raw.startsWith('data:')||/^https?:\/\//i.test(raw)?raw:'data:image/png;base64,'+raw;
       const a=document.createElement('a');a.href=s;a.download='twin-'+Date.now()+'.png';a.target='_blank';
-      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);});
+      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);shown++;
+    });
+    if(!shown)throw new Error('no image');
   }catch(e){ $('err').textContent='failed: '+e.message; }
   finally{ $('gen').textContent='generate'; $('gen').disabled=false; }
 };
