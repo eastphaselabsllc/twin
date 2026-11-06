@@ -4,16 +4,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101014">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="twin">
-<link rel="manifest" href='data:application/manifest+json,{"name":"twin","short_name":"twin","start_url":".","display":"standalone","background_color":"%23101014","theme_color":"%23101014","icons":[{"src":"data:image/svg%2Bxml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 512 512%27%3E%3Crect width=%27512%27 height=%27512%27 rx=%27112%27 fill=%27%23101014%27/%3E%3Ctext x=%27256%27 y=%27344%27 font-size=%27280%27 font-family=%27sans-serif%27 fill=%27%23c8623c%27 text-anchor=%27middle%27%3Et%3C/text%3E%3C/svg%3E","sizes":"512x512","type":"image/svg+xml"}]}'>
 <title>twin</title>
 <style>
 :root{--bg:#101014;--fg:#e8e6e3;--mut:#8b8b93;--card:#1a1a20;--in:#15151b;--bd:#2a2a33;--pri:#c8623c}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,ui-sans-serif,system-ui,sans-serif;
- display:flex;flex-direction:column;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 -apple-system,ui-sans-serif,system-ui,sans-serif;display:flex;flex-direction:column;padding-bottom:calc(56px + env(safe-area-inset-bottom))}
 header{padding:calc(10px + env(safe-area-inset-top)) 14px 8px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
 header b{font-size:15px;font-weight:500}
 #kstate{font-size:11px;color:var(--mut)}
@@ -21,7 +18,6 @@ main{flex:1;overflow:hidden;display:flex;flex-direction:column}
 .pane{flex:1;display:none;flex-direction:column;overflow:hidden;padding:10px 14px}
 .pane.on{display:flex}
 input,textarea,select{background:var(--in);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:10px 11px;font:inherit;font-size:14px;outline:none;width:100%}
-input[type=file]::file-selector-button{background:var(--card);color:var(--fg);border:1px solid var(--bd);border-radius:8px;padding:6px 10px;margin-right:10px;font:inherit}
 textarea{resize:none}
 button{background:var(--pri);color:#fff;border:0;border-radius:10px;padding:11px 15px;font:inherit;font-size:14px;font-weight:500}
 button.sec{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
@@ -29,124 +25,176 @@ button.sec{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
 #log{flex:1;overflow-y:auto;padding:4px 0 8px;-webkit-overflow-scrolling:touch}
 .msg{margin:0 0 14px;white-space:pre-wrap;word-wrap:break-word}
 .who{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);margin-bottom:3px}
+.msg img{max-width:100%;border-radius:10px;display:block;margin:6px 0;border:1px solid var(--bd);background:#000}
 nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--bg);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom);z-index:9}
 nav button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;padding:12px 0;border-radius:0}
 nav button.on{color:var(--pri);font-weight:500}
+#people{display:flex;gap:6px;overflow-x:auto;padding:6px 0 2px}
+.chip{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:3px 9px 3px 3px;font-size:12px;white-space:nowrap;color:var(--fg)}
+.chip img{width:26px;height:26px;border-radius:50%;object-fit:cover;display:block}
+.chip span.x{color:var(--mut);padding:0 2px}
 #gallery{display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow-y:auto;padding-bottom:10px}
-#gallery img{width:100%;border-radius:10px;display:block;border:1px solid var(--bd)}
-#err{color:#e0623f;font-size:12px;padding:0 14px 8px;white-space:pre-wrap}
+#gallery img{width:100%;border-radius:10px;display:block;border:1px solid var(--bd);background:#000}
+#err{display:none;color:#ff9b73;background:#2a1410;border-bottom:1px solid #4a2418;font-size:12px;padding:8px 14px;white-space:pre-wrap}
 .muted{color:var(--mut);font-size:11px}
-label.chk{display:flex;gap:7px;align-items:center;font-size:13px;color:var(--fg);margin-bottom:12px}
+label.chk{display:flex;gap:7px;align-items:center;font-size:13px;margin-bottom:12px}
 label.chk input{width:auto}
 #gate{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;justify-content:center;padding:24px;gap:12px}
 #gate h2{font-size:17px;font-weight:500;margin:0}
 </style></head><body>
-
 <header><b>twin</b><span id="kstate"></span></header>
 <div id="err"></div>
-
 <main>
   <div class="pane on" id="pChat">
-    <div class="row" style="margin-bottom:8px">
-      <input id="chatModel" list="cm" value="venice-uncensored">
+    <div class="row" style="margin-bottom:6px">
+      <input id="chatModel" list="cm" value="qwen2.5-vl-72b-a14b-instruct">
       <button id="clear" class="sec" style="width:auto;padding:10px 13px">clear</button>
     </div>
-    <datalist id="cm"><option value="venice-uncensored"><option value="venice-uncensored-role-play"><option value="qwen3-235b-a22b-instruct-2507"><option value="llama-3.3-70b"><option value="deepseek-v3.2"></datalist>
+    <datalist id="cm"><option value="qwen2.5-vl-72b-a14b-instruct"><option value="llama-3.2-11b-vision-instruct"><option value="deepseek-v3.2"><option value="venice-uncensored-role-play"></datalist>
+    <div id="people"></div>
     <div id="log"></div>
     <div class="row" style="padding-bottom:8px">
-      <textarea id="msg" rows="1" placeholder="message"></textarea>
+      <button id="addP" class="sec" style="width:auto;padding:11px 13px">+</button>
+      <textarea id="msg" rows="1" placeholder="message — attach a photo any time and it names them from your text"></textarea>
       <button id="send" style="width:auto;padding:12px 16px">↑</button>
       <button id="stop" class="sec" style="width:auto;padding:12px 16px;display:none">■</button>
     </div>
+    <input type="file" id="pFile" accept="image/*" style="display:none">
   </div>
-
   <div class="pane" id="pImg">
     <div class="row" style="margin-bottom:8px">
       <input id="imgModel" list="im" value="chroma">
-      <select id="ratio" style="width:auto"><option value="832x1216">2:3</option><option value="1216x832">3:2</option><option value="1024x1024">1:1</option><option value="768x1344">9:16</option><option value="1344x768">16:9</option></select>
+      <select id="ratio" style="width:auto"><option value="832x1216">2:3</option><option value="1216x832">3:2</option><option value="1024x1024">1:1</option></select>
     </div>
-    <datalist id="im"><option value="chroma"><option value="flux.1-dev-uncensored"><option value="flux.1-dev"><option value="stable-diffusion-3.5-large"></datalist>
-    <input type="file" id="face" accept="image/*" style="margin-bottom:7px"><div id="facePrev"></div>
+    <datalist id="im"><option value="chroma"><option value="flux-2-pro"><option value="flux-3-image"><option value="flux-2-max"></datalist>
+    <input type="file" id="face" accept="image/*" style="margin-bottom:7px">
+    <div id="facePrev"></div>
     <textarea id="prompt" rows="3" placeholder="prompt" style="margin-bottom:7px"></textarea>
     <textarea id="neg" rows="2" placeholder="negative prompt" style="margin-bottom:7px"></textarea>
-    <div class="row" style="margin-bottom:9px;flex-wrap:wrap">
-      <label class="chk" style="margin:0"><input id="safeOff" type="checkbox" checked> safe off</label>
-      <button id="gen" style="flex:1">generate</button>
-    </div>
+    <div class="row" style="margin-bottom:9px"><button id="gen" style="flex:1">generate</button></div>
     <div id="gallery"></div>
   </div>
-
   <div class="pane" id="pSet">
+    <label class="chk"><input id="autoIll" type="checkbox" checked> illustrate every reply automatically</label>
+    <label class="chk"><input id="autoRoute" type="checkbox" checked> prefer my own endpoint when it's up</label>
     <label class="chk"><input id="noSys" type="checkbox" checked> strip venice system prompt</label>
     <label class="chk"><input id="noPre" type="checkbox" checked> no-preamble instruction</label>
     <div class="row" style="margin-bottom:12px">
-      <label class="muted" style="flex:1">temp<br><input id="temp" type="number" step="0.05" value="0.95"></label>
+      <label class="muted" style="flex:1">temp<br><input id="temp" type="number" step="0.05" value="0.9"></label>
       <label class="muted" style="flex:1">top_p<br><input id="topp" type="number" step="0.05" value="0.95"></label>
     </div>
+    <label class="muted" style="display:block;margin-bottom:6px">my endpoint<br><input id="endpoint" value=""></label>
+    <p class="muted" style="margin:6px 0 14px">blank = venice only. put your tunnel here and it's used whenever reachable.</p>
     <button id="chKey" class="sec">change API key</button>
-    <label class="muted" style="display:block;margin-top:14px">endpoint<br><input id="endpoint" value="https://api.venice.ai/api/v1"></label>
-    <p class="muted" style="margin-top:14px">Key and settings stay on this device. Conversations persist locally; images download on tap.</p>
   </div>
 </main>
-
-<nav>
-  <button class="on" data-p="Chat">chat</button>
-  <button data-p="Img">image</button>
-  <button data-p="Set">settings</button>
-</nav>
-
+<nav><button class="on" data-p="Chat">chat</button><button data-p="Img">image</button><button data-p="Set">settings</button></nav>
 <div id="gate">
   <h2>venice API key</h2>
-  <p class="muted" style="margin:0">venice.ai → API. Stored on this device only.</p>
+  <p class="muted" style="margin:0">stored on this device only</p>
   <input id="kIn" type="password" placeholder="key" autocomplete="off">
   <button id="kGo">save</button>
 </div>
-
 <script>
-const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s', EP='https://api.venice.ai/api/v1';
-let key=localStorage.getItem(K)||'', ac=null, msgs=[], faceB64='', faceSeq=0;
-let S=Object.assign({noSys:1,noPre:1,temp:.95,topp:.95,endpoint:EP},JSON.parse(localStorage.getItem(SS)||'{}'));
-
-$('noSys').checked=!!S.noSys; $('noPre').checked=!!S.noPre; $('temp').value=S.temp; $('topp').value=S.topp;
-S.endpoint=String(S.endpoint||'').trim()||EP; $('endpoint').value=S.endpoint;
-['noSys','noPre','temp','topp','endpoint'].forEach(i=>$(i).onchange=()=>{
-  S={noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,temp:+$('temp').value||.95,topp:+$('topp').value||.95,endpoint:$('endpoint').value.trim()};
-  localStorage.setItem(SS,JSON.stringify(S));});
+const $=i=>document.getElementById(i), K='tw_k', CS='tw_c', SS='tw_s', CH='tw_chars';
+const VEN='https://api.venice.ai/api/v1';
+let key=localStorage.getItem(K)||'', ac=null, msgs=[], chars=[], myUp=null, myChecked=0;
+let S=Object.assign({autoIll:1,autoRoute:1,noSys:1,noPre:1,temp:.9,topp:.95,endpoint:''},JSON.parse(localStorage.getItem(SS)||'{}'));
+try{chars=JSON.parse(localStorage.getItem(CH)||'[]')}catch(e){chars=[]}
+['autoIll','autoRoute','noSys','noPre'].forEach(i=>$(i).checked=!!S[i]);
+$('temp').value=S.temp; $('topp').value=S.topp; $('endpoint').value=S.endpoint;
+['autoIll','autoRoute','noSys','noPre','temp','topp','endpoint'].forEach(i=>$(i).onchange=()=>{
+  S={autoIll:$('autoIll').checked?1:0,autoRoute:$('autoRoute').checked?1:0,noSys:$('noSys').checked?1:0,noPre:$('noPre').checked?1:0,
+     temp:+$('temp').value||.9,topp:+$('topp').value||.95,endpoint:$('endpoint').value.trim()};
+  localStorage.setItem(SS,JSON.stringify(S)); myUp=null;});
 $('endpoint').oninput=$('endpoint').onchange;
-
-function gate(){ $('gate').style.display = key ? 'none' : 'flex'; $('kstate').textContent = key ? 'key set' : ''; }
+function gate(){ $('gate').style.display=key?'none':'flex'; $('kstate').textContent=key?'key set':''; }
 gate();
-$('kGo').onclick=()=>{ const v=$('kIn').value.trim(); if(!v)return; key=v; localStorage.setItem(K,v); gate(); };
-$('chKey').onclick=()=>{ $('kIn').value=''; $('gate').style.display='flex'; };
-
+$('kGo').onclick=()=>{const v=$('kIn').value.trim(); if(!v)return; key=v; localStorage.setItem(K,v); gate();};
+$('chKey').onclick=()=>{$('kIn').value=''; $('gate').style.display='flex';};
+function err(t){ $('err').textContent=t; $('err').style.display=t?'block':'none'; }
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
   ['Chat','Img','Set'].forEach(p=>$('p'+p).classList.remove('on')); $('p'+b.dataset.p).classList.add('on');});
-
 const H=()=>({'Content-Type':'application/json','Authorization':'Bearer '+key});
+async function ep(){
+  if(!S.endpoint) return VEN;
+  if(!S.autoRoute) return S.endpoint;
+  if(myUp===true && Date.now()-myChecked<60000) return S.endpoint;
+  if(myUp===false && Date.now()-myChecked<30000) return VEN;
+  myChecked=Date.now();
+  try{ const r=await fetch(S.endpoint.replace(/\/$/,'')+'/health',{cache:'no-store'});
+    myUp=r.ok; return myUp ? S.endpoint : VEN; }
+  catch(e){ myUp=false; return VEN; }
+}
+function saveChars(){ localStorage.setItem(CH,JSON.stringify(chars)); }
+function drawPeople(){
+  $('people').innerHTML='';
+  chars.forEach((c,i)=>{
+    const d=document.createElement('div'); d.className='chip';
+    const im=document.createElement('img'); im.src=c.b64;
+    const n=document.createElement('span'); n.textContent=c.name;
+    const x=document.createElement('span'); x.className='x'; x.textContent='×';
+    x.onclick=()=>{ chars.splice(i,1); saveChars(); drawPeople(); };
+    d.append(im,n,x); $('people').append(d);
+  });
+}
+drawPeople();
+function shrink(file,cb){
+  const r=new FileReader();
+  r.onload=()=>{ const img=new Image();
+    img.onload=()=>{ const s=Math.min(1,512/Math.max(img.width,img.height));
+      const c=document.createElement('canvas'); c.width=img.width*s; c.height=img.height*s;
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      cb(c.toDataURL('image/jpeg',0.82)); };
+    img.src=r.result; };
+  r.readAsDataURL(file);
+}
 function add(w,t){const d=document.createElement('div');d.className='msg';
   const n=document.createElement('div');n.className='who';n.textContent=w==='user'?'you':'model';
   const b=document.createElement('div');b.textContent=t;d.append(n,b);$('log').append(d);
   $('log').scrollTop=$('log').scrollHeight;return b;}
+function addImg(c,src){ const im=document.createElement('img'); im.src=src; c.append(im); }
 function load(){try{msgs=JSON.parse(localStorage.getItem(CS)||'[]')}catch(e){msgs=[]}
-  $('log').innerHTML='';msgs.forEach(m=>add(m.role,m.content));}
+  $('log').innerHTML='';
+  msgs.forEach(m=>{ const t=typeof m.content==='string'?m.content:(Array.isArray(m.content)?(m.content.find(p=>p.type==='text')?.text||''):'');
+    const b=add(m.role,t);
+    if(Array.isArray(m.content)) m.content.forEach(p=>{ if(p.type==='image_url') addImg(b.parentElement,p.image_url.url); }); });}
 function save(){localStorage.setItem(CS,JSON.stringify(msgs));}
 load();
 $('clear').onclick=()=>{msgs=[];save();$('log').innerHTML='';};
 $('msg').addEventListener('input',e=>{e.target.style.height='auto';e.target.style.height=Math.min(e.target.scrollHeight,120)+'px';});
-
-async function send(){
-  const t=$('msg').value.trim(); if(!t||!key)return;
-  $('err').textContent=''; $('msg').value=''; $('msg').style.height='auto';
-  msgs.push({role:'user',content:t}); add('user',t); save();
+$('addP').onclick=()=>$('pFile').click();
+$('pFile').onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const typed=$('msg').value.trim();
+  const m=typed.match(/this is ([A-Za-z][\w'-]{0,20})/i);
+  const name = m ? m[1] : 'P'+(chars.length+1);
+  shrink(f, data=>{
+    chars.push({name, b64:data}); saveChars(); drawPeople();
+    $('msg').value='';
+    const text = m ? typed : 'This is '+name+'.';
+    const content=[{type:'text',text}, {type:'image_url',image_url:{url:data}}];
+    msgs.push({role:'user',content}); save();
+    const b=add('user',text); addImg(b.parentElement,data);
+    chat();
+  });
+  e.target.value='';
+};
+function sysPrompt(){
+  const p=['No preamble. Never open with "Certainly". Answer directly, no closing offer to help.'];
+  if(chars.length) p.push('Known people: '+chars.map(c=>c.name).join(', ')+'. Their photos are earlier in the thread — keep faces and builds consistent.');
+  p.push('Write scenes visually: framing, pose, clothing, light, setting. When a reply describes a moment worth seeing, end with [[img: prompt]] on its own line.');
+  return p.join(' ');
+}
+async function chat(){
+  const sm=[{role:'system',content:sysPrompt()},...msgs];
   const out=add('assistant',''); $('send').style.display='none'; $('stop').style.display='block';
   ac=new AbortController();
-  const sm=msgs.slice();
-  if(S.noPre) sm.unshift({role:'system',content:'No preamble. Never open with "Certainly" or "Great question". Answer directly, do not restate the question, no closing offer to help.'});
   try{
-    const r=await fetch('https://api.venice.ai/api/v1/chat/completions',{method:'POST',headers:H(),signal:ac.signal,
+    const r=await fetch(VEN+'/chat/completions',{method:'POST',headers:H(),signal:ac.signal,
       body:JSON.stringify({model:$('chatModel').value.trim(),messages:sm,stream:true,
-        temperature:+S.temp,top_p:+S.topp,max_tokens:2000,
+        temperature:+S.temp,top_p:+S.topp,max_tokens:2500,
         venice_parameters:{include_venice_system_prompt:!S.noSys}})});
     if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
     const rd=r.body.getReader(),dec=new TextDecoder(); let buf='',full='';
@@ -155,55 +203,65 @@ async function send(){
       for(const p of ps)for(const ln of p.split('\n')){
         if(!ln.startsWith('data: '))continue; const raw=ln.slice(6).trim(); if(raw==='[DONE]')continue;
         try{const j=JSON.parse(raw);const dl=j.choices?.[0]?.delta?.content;
-          if(dl){full+=dl;out.textContent=full;$('log').scrollTop=$('log').scrollHeight;}}catch(e){}}}
+          if(dl){full+=dl;out.textContent=full.replace(/\[\[img:[\s\S]*?\]\]/g,'').trim();$('log').scrollTop=$('log').scrollHeight;}}catch(e){}}}
     msgs.push({role:'assistant',content:full}); save();
-  }catch(e){ if(e.name==='AbortError')out.textContent+='\n[stopped]'; else $('err').textContent='failed: '+e.message; }
+    if(S.autoIll){
+      const m=full.match(/\[\[img:\s*([\s\S]*?)\]\]/);
+      const body=out.textContent.trim();
+      const p = m ? m[1].trim() : (body ? 'cinematic still, '+body.split('\n').slice(-2).join(' ').slice(0,400) : null);
+      if(p) genInline(p, out.parentElement);
+    }
+  }catch(e){ if(e.name==='AbortError')out.textContent+='\n[stopped]'; else err('chat failed: '+e.message); }
   finally{ $('send').style.display='block'; $('stop').style.display='none'; ac=null; }
 }
+async function send(){
+  const t=$('msg').value.trim(); if(!t||!key)return;
+  err(''); $('msg').value=''; $('msg').style.height='auto';
+  msgs.push({role:'user',content:t}); add('user',t); save(); chat();
+}
 $('send').onclick=send; $('stop').onclick=()=>ac&&ac.abort();
-
-function clearFace(){faceSeq++;faceB64='';const el=$('face');if(el.value)el.value='';$('facePrev').innerHTML='';}
-$('face').onchange=()=>{
-  const f=$('face').files&&$('face').files[0], seq=++faceSeq;
-  if(!f){clearFace();return;}
+const scrub=p=>p.replace(/\b12 year old\b/gi,'twelve-year-old').replace(/\s+/g,' ').trim();
+async function genInline(promptText, container){
+  const holder=document.createElement('div'); holder.className='muted'; holder.textContent='generating…';
+  container.append(holder);
+  const face=chars.find(c=>new RegExp('\\b'+c.name+'\\b','i').test(promptText));
+  const b={model:$('imgModel').value.trim(),prompt:promptText,width:832,height:1216,format:'png',safe_mode:false,steps:28,cfg_scale:7};
+  if(face) b.face_b64=face.b64.split(',')[1];
+  const base=(await ep()).replace(/\/$/,'');
+  try{
+    let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+    if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
+    if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,160));
+    const j=await r.json(); if(!j.images?.length)throw new Error('no image');
+    holder.remove();
+    j.images.forEach(x=>{ const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
+      const a=document.createElement('a'); a.href=s; a.download='twin-'+Date.now()+'.png'; a.target='_blank';
+      addImg(a,s); container.append(a); });
+  }catch(e){ holder.textContent='image failed: '+e.message; }
+}
+let faceB64=null;
+$('face').onchange=e=>{ const f=e.target.files[0]; if(!f)return;
   const r=new FileReader();
-  r.onload=()=>{
-    if(seq!==faceSeq||typeof r.result!=='string')return;
-    faceB64=r.result.split(',')[1]||'';
-    $('facePrev').innerHTML='';
-    if(!faceB64)return;
-    const im=document.createElement('img');im.src=r.result;im.alt='reference face';
-    im.style.cssText='width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--bd);display:block';
-    const rm=document.createElement('button');rm.type='button';rm.className='sec';rm.textContent='remove';
-    rm.style.cssText='width:auto;padding:6px 10px;font-size:12px';rm.onclick=clearFace;
-    const row=document.createElement('div');row.className='row';row.style.marginBottom='7px';
-    row.append(im,rm);$('facePrev').append(row);
-  };
-  r.onerror=()=>{if(seq===faceSeq){clearFace();$('err').textContent='failed: could not read image';}};
-  r.readAsDataURL(f);
-};
-
+  r.onload=()=>{ faceB64=r.result.split(',')[1];
+    $('facePrev').innerHTML='<img src="'+r.result+'" style="width:64px;border-radius:8px;margin-bottom:7px">'; };
+  r.readAsDataURL(f); };
 $('gen').onclick=async()=>{
-  const p=$('prompt').value.trim(); if(!p||!key)return; $('err').textContent='';
+  const p=$('prompt').value.trim(); if(!p)return; err('');
   const [w,h]=$('ratio').value.split('x').map(Number);
   $('gen').textContent='…'; $('gen').disabled=true;
-  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:!$('safeOff').checked,steps:28,cfg_scale:5.5};
+  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:7};
   if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
   if(faceB64)b.face_b64=faceB64;
+  const base=(await ep()).replace(/\/$/,'');
   try{
-    const r=await fetch((S.endpoint||EP).replace(/\/+$/,'')+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+    let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+    if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
     if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
-    const j=await r.json(); if(!j.images?.length)throw new Error('no image');
-    let shown=0;
-    j.images.forEach(x=>{
-      const raw=typeof x==='string'?x:(x&&typeof x==='object'&&(x.b64_json||x.base64||x.image||(typeof x.url==='string'?x.url:'')))||'';
-      if(typeof raw!=='string'||!raw)return;
-      const s=raw.startsWith('data:')||/^https?:\/\//i.test(raw)?raw:'data:image/png;base64,'+raw;
+    const j=await r.json(); if(!j.images?.length)throw new Error('no image returned');
+    j.images.forEach(x=>{const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
       const a=document.createElement('a');a.href=s;a.download='twin-'+Date.now()+'.png';a.target='_blank';
-      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);shown++;
-    });
-    if(!shown)throw new Error('no image');
-  }catch(e){ $('err').textContent='failed: '+e.message; }
+      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);});
+  }catch(e){ err('image failed: '+e.message); }
   finally{ $('gen').textContent='generate'; $('gen').disabled=false; }
 };
 </script></body></html>
