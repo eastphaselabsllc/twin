@@ -150,32 +150,43 @@ function drawPeople(){
   $('people').innerHTML='';
   chars.forEach((c,i)=>{
     const d=document.createElement('div'); d.className='chip'+(faceOn(c)?' on':'');
-    const im=document.createElement('img'); im.src=c.b64;
-    const n=document.createElement('span'); n.textContent=c.name;
+    const shots=shotsOf(c);
+    const im=document.createElement('img'); im.src=shots[shots.length-1]||c.b64;
+    const n=document.createElement('span'); n.textContent=c.name+(shots.length>1?' · '+shots.length:'');
     const x=document.createElement('span'); x.className='x'; x.textContent='×';
     x.onclick=ev=>{ ev.stopPropagation(); chars.splice(i,1); saveChars(); drawPeople(); };
     d.onclick=()=>{ if(faceOn(c)) c.use=false; else { c.use=true; c.usedAt=Date.now(); } saveChars(); drawPeople(); };
     d.append(im,n,x); $('people').append(d);
   });
-  if(chars.length){ const h=document.createElement('span'); h.className='muted'; h.style.cssText='align-self:center;padding-left:4px'; h.textContent='tap a person to use their face'; $('people').append(h); }
+  if(chars.length){ const h=document.createElement('span'); h.className='muted'; h.style.cssText='align-self:center;padding-left:4px'; h.textContent='tap to choose · same name adds a photo'; $('people').append(h); }
 }
+function shotsOf(c){ return (Array.isArray(c.shots)&&c.shots.length)?c.shots:(c.b64?[c.b64]:[]); }
 function savePerson(name, data){
   const n=(name||'').trim().slice(0,24)||('P'+(chars.length+1));
   const now=Date.now();
+  const prev=JSON.stringify(chars);
   const i=chars.findIndex(c=>c.name.toLowerCase()===n.toLowerCase());
-  if(i>=0){ chars[i].b64=data; chars[i].use=true; chars[i].usedAt=now; }
-  else chars.push({name:n,b64:data,use:true,usedAt:now});
-  saveChars(); drawPeople();
-  return chars[i>=0?i:chars.length-1].name;
+  if(i>=0){
+    const shots=shotsOf(chars[i]).slice();
+    shots.push(data);
+    while(shots.length>6) shots.shift();
+    chars[i].shots=shots; chars[i].b64=shots[0]; chars[i].use=true; chars[i].usedAt=now;
+  } else chars.push({name:n,b64:data,shots:[data],use:true,usedAt:now});
+  try{ saveChars(); }
+  catch(e){ chars=JSON.parse(prev); drawPeople(); err('not enough room on this phone for another photo'); return n; }
+  drawPeople();
+  return chars.find(c=>c.name.toLowerCase()===n.toLowerCase()).name;
 }
 drawPeople();
 function shrink(file,cb){
   const r=new FileReader();
   r.onload=()=>{ const img=new Image();
-    img.onload=()=>{ const s=Math.min(1,512/Math.max(img.width,img.height));
-      const c=document.createElement('canvas'); c.width=img.width*s; c.height=img.height*s;
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-      cb(c.toDataURL('image/jpeg',0.82)); };
+    img.onload=()=>{ const long=Math.max(img.width,img.height), short=Math.min(img.width,img.height)||1;
+      let s=768/long; if(short*s<256) s=256/short; s=Math.min(s,1024/long);
+      const w=Math.max(1,Math.round(img.width*s)), h=Math.max(1,Math.round(img.height*s));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.8)); };
     img.src=r.result; };
   r.readAsDataURL(file);
 }
@@ -277,22 +288,62 @@ function primaryFace(promptText){
   if(chars.length===1 && chars[0].use!==false) return chars[0];
   return null;
 }
+const EDIT='qwen-image-2-1-turbo-edit';
+function rawB64(s){ return s&&String(s).includes(',')?s.split(',')[1]:(s||''); }
+function aspectFor(w,h){ return w>h?'3:2':w===h?'1:1':'2:3'; }
+function likenessPrompt(p,n){
+  const scene=(p||'').replace(/\s+/g,' ').trim();
+  if(n>1) return 'These photos are the same person. Create one new photograph of them, matching their face across the references. '+scene;
+  return 'Create a new photograph of this same person, matching their face. '+scene;
+}
+function blocked(status,text){ return status===403 || /content.?policy|violation|safety filter|moderation/i.test(text||''); }
+async function imageUrls(r){
+  const ct=(r.headers.get('content-type')||'').toLowerCase();
+  if(ct.includes('json')){
+    const j=await r.json(); if(!j.images||!j.images.length) throw new Error('no image');
+    return j.images.map(x=>x.startsWith('data:')?x:'data:image/png;base64,'+x);
+  }
+  const bytes=new Uint8Array(await r.arrayBuffer());
+  let bin='';
+  for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  const mime=ct.startsWith('image/')?ct.split(';')[0]:'image/png';
+  return ['data:'+mime+';base64,'+btoa(bin)];
+}
+async function makeImage(promptText,w,h,opts){
+  opts=opts||{};
+  const face=opts.face?null:primaryFace(promptText);
+  const shots=face?shotsOf(face).map(rawB64).filter(Boolean).slice(0,6):[];
+  const base=(await ep()).replace(/\/$/,'');
+  const ratio=aspectFor(w,h);
+  if(!opts.face && (shots.length>1 || (shots.length===1 && base===VEN))){
+    try{
+      const url=shots.length>1?VEN+'/image/multi-edit':VEN+'/image/edit';
+      const body=shots.length>1
+        ? {modelId:EDIT,prompt:likenessPrompt(promptText,shots.length),images:shots,safe_mode:false,output_format:'png',aspect_ratio:ratio}
+        : {model:EDIT,prompt:likenessPrompt(promptText,1),image:shots[0],safe_mode:false,output_format:'png',aspect_ratio:ratio};
+      const r=await fetch(url,{method:'POST',headers:H(),body:JSON.stringify(body)});
+      if(!r.ok){ const t=await r.text(); const e=new Error(r.status+' '+t.slice(0,200)); e.status=r.status; e.detail=t; throw e; }
+      return {urls:await imageUrls(r), note:''};
+    }catch(e){ if(blocked(e.status, e.detail||e.message)) throw e; }
+  }
+  const b={model:$('imgModel').value.trim(),prompt:promptText,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
+  if(opts.negative) b.negative_prompt=opts.negative;
+  const single=opts.face||shots[0];
+  if(single) b.face_b64=single;
+  let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
+  if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
+  if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
+  const note=single&&base===VEN?'your endpoint is offline, so this picture has no reference face':'';
+  return {urls:await imageUrls(r), note};
+}
 async function genInline(promptText, container){
   const holder=document.createElement('div'); holder.className='muted'; holder.textContent='generating…';
   container.append(holder);
-  const face=primaryFace(promptText);
-  const base=(await ep()).replace(/\/$/,'');
-  const b={model:$('imgModel').value.trim(),prompt:promptText,width:832,height:1216,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
-  if(face) b.face_b64=face.b64.split(',')[1];
-  if(face&&base===VEN){ const note=document.createElement('div'); note.className='muted'; note.textContent='your endpoint is offline, so this picture has no reference face'; container.append(note); }
   try{
-    let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
-    if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
-    if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,160));
-    const j=await r.json(); if(!j.images?.length)throw new Error('no image');
+    const out=await makeImage(promptText,832,1216);
     holder.remove();
-    j.images.forEach(x=>{ const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
-      const a=document.createElement('a'); a.href=s; a.download='twin-'+Date.now()+'.png'; a.target='_blank';
+    if(out.note){ const note=document.createElement('div'); note.className='muted'; note.textContent=out.note; container.append(note); }
+    out.urls.forEach(s=>{ const a=document.createElement('a'); a.href=s; a.download='twin-'+Date.now()+'.png'; a.target='_blank';
       addImg(a,s); container.append(a); });
   }catch(e){ holder.textContent='image failed: '+e.message; }
 }
@@ -306,19 +357,11 @@ $('gen').onclick=async()=>{
   const p=$('prompt').value.trim(); if(!p)return; err('');
   const [w,h]=$('ratio').value.split('x').map(Number);
   $('gen').textContent='…'; $('gen').disabled=true;
-  const base=(await ep()).replace(/\/$/,'');
-  const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
-  if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
-  if(faceB64)b.face_b64=faceB64;
-  else { const face=primaryFace(p); if(face) b.face_b64=face.b64.split(',')[1]; }
   try{
-    let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
-    if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
-    if(!r.ok)throw new Error(r.status+' '+(await r.text()).slice(0,200));
-    const j=await r.json(); if(!j.images?.length)throw new Error('no image returned');
-    j.images.forEach(x=>{const s=x.startsWith('data:')?x:'data:image/png;base64,'+x;
-      const a=document.createElement('a');a.href=s;a.download='twin-'+Date.now()+'.png';a.target='_blank';
-      const im=document.createElement('img');im.src=s;a.append(im);$('gallery').prepend(a);});
+    const out=await makeImage(p,w,h,{face:faceB64||'', negative:$('neg').value.trim()});
+    if(out.note) err(out.note);
+    out.urls.forEach(s=>{ const a=document.createElement('a'); a.href=s; a.download='twin-'+Date.now()+'.png'; a.target='_blank';
+      const im=document.createElement('img'); im.src=s; a.append(im); $('gallery').prepend(a); });
   }catch(e){ err('image failed: '+e.message); }
   finally{ $('gen').textContent='generate'; $('gen').disabled=false; }
 };
