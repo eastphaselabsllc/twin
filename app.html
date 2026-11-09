@@ -31,6 +31,7 @@ nav button{flex:1;background:none;border:0;color:var(--mut);font-size:11px;paddi
 nav button.on{color:var(--pri);font-weight:500}
 #people{display:flex;gap:6px;overflow-x:auto;padding:6px 0 2px}
 .chip{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--bd);border-radius:20px;padding:3px 9px 3px 3px;font-size:12px;white-space:nowrap;color:var(--fg)}
+.chip.on{border-color:var(--pri)}
 .chip img{width:26px;height:26px;border-radius:50%;object-fit:cover;display:block}
 .chip span.x{color:var(--mut);padding:0 2px}
 #gallery{display:grid;grid-template-columns:1fr 1fr;gap:8px;overflow-y:auto;padding-bottom:10px}
@@ -54,8 +55,9 @@ label.chk input{width:auto}
     <div id="people"></div>
     <div id="log"></div>
     <div class="row" style="padding-bottom:8px">
+      <input id="who" placeholder="name" style="width:74px;flex:none" autocomplete="off">
       <button id="addP" class="sec" style="width:auto;padding:11px 13px">+</button>
-      <textarea id="msg" rows="1" placeholder="message — attach a photo any time and it names them from your text"></textarea>
+      <textarea id="msg" rows="1" placeholder="message"></textarea>
       <button id="send" style="width:auto;padding:12px 16px">↑</button>
       <button id="stop" class="sec" style="width:auto;padding:12px 16px;display:none">■</button>
     </div>
@@ -143,16 +145,28 @@ async function ep(){
   catch(e){ myUp=false; return VEN; }
 }
 function saveChars(){ localStorage.setItem(CH,JSON.stringify(chars)); }
+function faceOn(c){ if(c.use===true) return true; if(c.use===false) return false; return chars.length===1; }
 function drawPeople(){
   $('people').innerHTML='';
   chars.forEach((c,i)=>{
-    const d=document.createElement('div'); d.className='chip';
+    const d=document.createElement('div'); d.className='chip'+(faceOn(c)?' on':'');
     const im=document.createElement('img'); im.src=c.b64;
     const n=document.createElement('span'); n.textContent=c.name;
     const x=document.createElement('span'); x.className='x'; x.textContent='×';
-    x.onclick=()=>{ chars.splice(i,1); saveChars(); drawPeople(); };
+    x.onclick=ev=>{ ev.stopPropagation(); chars.splice(i,1); saveChars(); drawPeople(); };
+    d.onclick=()=>{ if(faceOn(c)) c.use=false; else { c.use=true; c.usedAt=Date.now(); } saveChars(); drawPeople(); };
     d.append(im,n,x); $('people').append(d);
   });
+  if(chars.length){ const h=document.createElement('span'); h.className='muted'; h.style.cssText='align-self:center;padding-left:4px'; h.textContent='tap a person to use their face'; $('people').append(h); }
+}
+function savePerson(name, data){
+  const n=(name||'').trim().slice(0,24)||('P'+(chars.length+1));
+  const now=Date.now();
+  const i=chars.findIndex(c=>c.name.toLowerCase()===n.toLowerCase());
+  if(i>=0){ chars[i].b64=data; chars[i].use=true; chars[i].usedAt=now; }
+  else chars.push({name:n,b64:data,use:true,usedAt:now});
+  saveChars(); drawPeople();
+  return chars[i>=0?i:chars.length-1].name;
 }
 drawPeople();
 function shrink(file,cb){
@@ -183,12 +197,12 @@ $('addP').onclick=()=>$('pFile').click();
 $('pFile').onchange=e=>{
   const f=e.target.files[0]; if(!f)return;
   const typed=$('msg').value.trim();
-  const m=typed.match(/this is ([A-Za-z][\w'-]{0,20})/i);
-  const name = m ? m[1] : 'P'+(chars.length+1);
+  const fromMsg=typed.match(/this is ([A-Za-z][\w'-]{0,20})/i);
+  const wanted=$('who').value.trim()||(fromMsg?fromMsg[1]:'');
   shrink(f, data=>{
-    chars.push({name, b64:data}); saveChars(); drawPeople();
-    $('msg').value='';
-    const text = m ? typed : 'This is '+name+'.';
+    const name=savePerson(wanted, data);
+    $('who').value=''; $('msg').value=''; $('msg').style.height='auto';
+    const text=typed && new RegExp('\\b'+reEsc(name)+'\\b','i').test(typed) ? typed : ('This is '+name+'.'+(typed?' '+typed:''));
     const content=[{type:'text',text}, {type:'image_url',image_url:{url:data}}];
     msgs.push({role:'user',content}); save();
     const b=add('user',text); addImg(b.parentElement,data);
@@ -198,7 +212,7 @@ $('pFile').onchange=e=>{
 };
 function sysPrompt(){
   const p=['No preamble. Never open with "Certainly". Answer directly, no closing offer to help.'];
-  if(chars.length) p.push('Known people: '+chars.map(c=>c.name).join(', ')+'. Their photos are earlier in the thread — keep faces and builds consistent. Whenever one of them is in the scene, include their exact name (e.g. '+chars.map(c=>c.name).join(', ')+') in the [[img: ...]] prompt.');
+  if(chars.length) p.push('Known people: '+chars.map(c=>c.name).join(', ')+'. Their photos are earlier in the thread — keep faces and builds consistent, and keep the gender the user states for each person. Whenever one of them is in the scene, include their exact name (e.g. '+chars.map(c=>c.name).join(', ')+') in the [[img: ...]] prompt.');
   p.push('Write scenes visually: framing, pose, clothing, light, setting. When a reply describes a moment worth seeing, end with [[img: prompt]] on its own line.');
   return p.join(' ');
 }
@@ -248,13 +262,29 @@ async function send(){
 $('send').onclick=send; $('stop').onclick=()=>ac&&ac.abort();
 const scrub=p=>p.replace(/\b12 year old\b/gi,'twelve-year-old').replace(/\s+/g,' ').trim();
 const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function namedChars(promptText){
+  return chars.filter(c=>new RegExp('\\b'+reEsc(c.name)+'\\b','i').test(promptText)).sort((a,b)=>{
+    const ia=promptText.toLowerCase().search(new RegExp('\\b'+reEsc(a.name)+'\\b','i'));
+    const ib=promptText.toLowerCase().search(new RegExp('\\b'+reEsc(b.name)+'\\b','i'));
+    return ia-ib;
+  });
+}
+function primaryFace(promptText){
+  const named=namedChars(promptText);
+  if(named.length) return named[0];
+  const picked=chars.filter(faceOn).sort((a,b)=>(b.usedAt||0)-(a.usedAt||0));
+  if(picked.length) return picked[0];
+  if(chars.length===1 && chars[0].use!==false) return chars[0];
+  return null;
+}
 async function genInline(promptText, container){
   const holder=document.createElement('div'); holder.className='muted'; holder.textContent='generating…';
   container.append(holder);
-  const face=chars.find(c=>new RegExp('\\b'+reEsc(c.name)+'\\b','i').test(promptText))||(chars.length===1?chars[0]:null);
+  const face=primaryFace(promptText);
   const base=(await ep()).replace(/\/$/,'');
   const b={model:$('imgModel').value.trim(),prompt:promptText,width:832,height:1216,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
   if(face) b.face_b64=face.b64.split(',')[1];
+  if(face&&base===VEN){ const note=document.createElement('div'); note.className='muted'; note.textContent='your endpoint is offline, so this picture has no reference face'; container.append(note); }
   try{
     let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
     if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
@@ -280,6 +310,7 @@ $('gen').onclick=async()=>{
   const b={model:$('imgModel').value.trim(),prompt:p,width:w,height:h,format:'png',safe_mode:false,steps:28,cfg_scale:base!==VEN?5.5:7};
   if($('neg').value.trim())b.negative_prompt=$('neg').value.trim();
   if(faceB64)b.face_b64=faceB64;
+  else { const face=primaryFace(p); if(face) b.face_b64=face.b64.split(',')[1]; }
   try{
     let r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)});
     if(r.status===422){ b.prompt=scrub(b.prompt); r=await fetch(base+'/image/generate',{method:'POST',headers:H(),body:JSON.stringify(b)}); }
